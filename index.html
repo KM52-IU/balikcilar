@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Balıkcılar – Das Angelspiel</title>
+<style>
+  :root {
+    --water-top: #4fc3f7;
+    --water-bottom: #01579b;
+    --sky: #aee7ff;
+    --gold: #ffd54f;
+    --accent: #ff7043;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+    background: linear-gradient(#bfe9ff, #7fd0f5);
+    color: #04293a;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    user-select: none;
+  }
+
+  .app {
+    width: 100%;
+    max-width: 760px;
+  }
+
+  h1 {
+    text-align: center;
+    font-size: 2.6rem;
+    letter-spacing: 1px;
+    color: #04293a;
+    text-shadow: 0 2px 0 #fff, 0 4px 10px rgba(0,0,0,.15);
+  }
+  h1 .fish { font-size: 2.6rem; }
+  .subtitle { text-align: center; margin: 4px 0 18px; font-size: 1rem; opacity: .8; }
+
+  .panel {
+    background: rgba(255,255,255,.85);
+    border-radius: 18px;
+    padding: 22px;
+    box-shadow: 0 12px 30px rgba(0,60,100,.25);
+  }
+
+  /* --- Start / Angler-Auswahl --- */
+  .anglers {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin: 18px 0;
+  }
+  .angler {
+    cursor: pointer;
+    text-align: center;
+    padding: 16px 8px;
+    border-radius: 14px;
+    border: 3px solid transparent;
+    background: #eaf6ff;
+    transition: transform .12s, border-color .12s, background .12s;
+  }
+  .angler:hover { transform: translateY(-4px); }
+  .angler.selected { border-color: var(--accent); background: #fff3e0; }
+  .angler .face { font-size: 3rem; line-height: 1; }
+  .angler .name { margin-top: 8px; font-weight: bold; font-size: 1.15rem; }
+  .angler .tag { font-size: .8rem; opacity: .7; }
+
+  .btn {
+    display: block;
+    width: 100%;
+    padding: 14px;
+    font-size: 1.2rem;
+    font-weight: bold;
+    border: none;
+    border-radius: 12px;
+    background: var(--accent);
+    color: #fff;
+    cursor: pointer;
+    transition: filter .12s, transform .08s;
+    box-shadow: 0 6px 0 #c6421f;
+  }
+  .btn:hover { filter: brightness(1.05); }
+  .btn:active { transform: translateY(4px); box-shadow: 0 2px 0 #c6421f; }
+  .btn:disabled { background: #b0bec5; box-shadow: 0 6px 0 #78909c; cursor: not-allowed; }
+
+  .rules { margin: 14px 0; font-size: .95rem; line-height: 1.5; }
+  .rules ul { margin-left: 18px; }
+
+  /* --- HUD --- */
+  .hud {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    font-weight: bold;
+    font-size: 1.1rem;
+  }
+  .hud .time { color: var(--accent); }
+
+  /* --- Spielfeld --- */
+  #game {
+    position: relative;
+    width: 100%;
+    height: 440px;
+    border-radius: 14px;
+    overflow: hidden;
+    background: linear-gradient(var(--sky) 0%, var(--sky) 18%, var(--water-top) 18%, var(--water-bottom) 100%);
+    cursor: crosshair;
+    box-shadow: inset 0 0 40px rgba(0,0,0,.2);
+  }
+
+  .boat {
+    position: absolute;
+    top: 42px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 3rem;
+    z-index: 5;
+    filter: drop-shadow(0 4px 4px rgba(0,0,0,.3));
+  }
+  .angler-icon {
+    position: absolute;
+    top: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 2rem;
+    z-index: 6;
+  }
+
+  .fish {
+    position: absolute;
+    font-size: 2rem;
+    will-change: left;
+    z-index: 3;
+    filter: drop-shadow(0 3px 3px rgba(0,0,0,.25));
+    transition: transform .1s;
+  }
+  .fish.flip { transform: scaleX(-1); }
+  .fish.caught {
+    transition: top .5s ease-in, transform .5s;
+    z-index: 7;
+  }
+
+  .score-pop {
+    position: absolute;
+    font-weight: bold;
+    font-size: 1.1rem;
+    z-index: 9;
+    pointer-events: none;
+    animation: floatUp 1s ease-out forwards;
+    text-shadow: 0 1px 2px rgba(0,0,0,.4);
+  }
+  .score-pop.plus { color: #fff; }
+  .score-pop.minus { color: #ffebee; }
+  @keyframes floatUp {
+    from { transform: translateY(0); opacity: 1; }
+    to   { transform: translateY(-50px); opacity: 0; }
+  }
+
+  .hint {
+    position: absolute;
+    bottom: 10px;
+    width: 100%;
+    text-align: center;
+    color: #fff;
+    font-size: .9rem;
+    opacity: .85;
+    z-index: 4;
+    pointer-events: none;
+  }
+
+  .hidden { display: none !important; }
+
+  /* --- Endbildschirm --- */
+  .result { text-align: center; }
+  .result .big { font-size: 3.4rem; margin: 6px 0; }
+  .result .headline { font-size: 1.5rem; font-weight: bold; margin: 8px 0; }
+  .result .final-score { font-size: 2rem; color: var(--accent); font-weight: bold; }
+  .best { text-align:center; margin-top:10px; font-size:.95rem; opacity:.8; }
+</style>
+</head>
+<body>
+<div class="app">
+  <h1><span class="fish">🎣</span> Balıkcılar <span class="fish">🐟</span></h1>
+  <p class="subtitle">Das Angelspiel mit Uğur, Murat &amp; Beytullah</p>
+
+  <!-- START-BILDSCHIRM -->
+  <div class="panel" id="startScreen">
+    <p style="text-align:center;font-size:1.1rem;">Wer geht heute angeln? Wähle deinen Freund:</p>
+    <div class="anglers" id="anglerList"></div>
+
+    <div class="rules">
+      <strong>So wird gespielt:</strong>
+      <ul>
+        <li>🐟 Klicke auf die Fische im Wasser, um sie zu fangen.</li>
+        <li>Verschiedene Fische geben unterschiedlich viele Punkte.</li>
+        <li>🥇 Der goldene Fisch ist selten und wertvoll!</li>
+        <li>🥾 Vorsicht vor alten Stiefeln – die geben Minuspunkte.</li>
+        <li>⏱️ Du hast <strong>60 Sekunden</strong>. Fang so viel wie möglich!</li>
+      </ul>
+    </div>
+
+    <button class="btn" id="startBtn" disabled>Zuerst Angler wählen</button>
+  </div>
+
+  <!-- SPIEL-BILDSCHIRM -->
+  <div class="panel hidden" id="playScreen">
+    <div class="hud">
+      <span id="hudPlayer">🧑 Uğur</span>
+      <span>Punkte: <span id="hudScore">0</span></span>
+      <span class="time">⏱️ <span id="hudTime">60</span>s</span>
+    </div>
+    <div id="game"></div>
+  </div>
+
+  <!-- END-BILDSCHIRM -->
+  <div class="panel hidden" id="endScreen">
+    <div class="result">
+      <div class="big" id="endFace">🧑</div>
+      <div class="headline" id="endHeadline">Oyun bitti!</div>
+      <p><span id="endPlayer">Uğur</span> hat gefangen:</p>
+      <div class="final-score"><span id="endScore">0</span> Punkte</div>
+      <p id="endRank" style="margin-top:8px;"></p>
+      <div class="best" id="bestLine"></div>
+      <button class="btn" id="againBtn" style="margin-top:18px;">Nochmal angeln 🎣</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------- Daten ----------
+  const ANGLERS = [
+    { name: "Uğur",      face: "🧔", tag: "der Geduldige" },
+    { name: "Murat",     face: "🧑", tag: "der Schnelle" },
+    { name: "Beytullah", face: "👨", tag: "der Glückliche" },
+  ];
+
+  // Fischtypen: emoji, Punkte, Gewicht (Häufigkeit), Geschwindigkeit, Größe
+  const FISH_TYPES = [
+    { emoji: "🐟", points: 1,  weight: 40, speed: 1.4, label: "Kleiner Fisch" },
+    { emoji: "🐠", points: 2,  weight: 28, speed: 1.9, label: "Bunter Fisch" },
+    { emoji: "🐡", points: 3,  weight: 16, speed: 1.1, label: "Kugelfisch" },
+    { emoji: "🦑", points: 4,  weight: 8,  speed: 2.4, label: "Tintenfisch" },
+    { emoji: "🦐", points: 2,  weight: 10, speed: 2.1, label: "Garnele" },
+    { emoji: "🐙", points: 5,  weight: 5,  speed: 1.3, label: "Oktopus" },
+    { emoji: "🥇", points: 10, weight: 3,  speed: 3.0, label: "Goldfisch!" },
+    { emoji: "🥾", points: -3, weight: 9,  speed: 1.0, label: "Alter Stiefel" },
+  ];
+
+  const GAME_SECONDS = 60;
+
+  // ---------- Zustand ----------
+  let selectedAngler = null;
+  let score = 0;
+  let timeLeft = GAME_SECONDS;
+  let fishes = [];
+  let running = false;
+  let lastTs = 0;
+  let spawnTimer = 0;
+  let countdownId = null;
+  let rafId = null;
+
+  // ---------- DOM ----------
+  const $ = (id) => document.getElementById(id);
+  const startScreen = $("startScreen");
+  const playScreen  = $("playScreen");
+  const endScreen   = $("endScreen");
+  const anglerList  = $("anglerList");
+  const startBtn    = $("startBtn");
+  const gameEl      = $("game");
+  const hudPlayer   = $("hudPlayer");
+  const hudScore    = $("hudScore");
+  const hudTime     = $("hudTime");
+
+  // ---------- Angler-Auswahl aufbauen ----------
+  ANGLERS.forEach((a, i) => {
+    const div = document.createElement("div");
+    div.className = "angler";
+    div.innerHTML =
+      '<div class="face">' + a.face + '</div>' +
+      '<div class="name">' + a.name + '</div>' +
+      '<div class="tag">' + a.tag + '</div>';
+    div.addEventListener("click", () => selectAngler(i, div));
+    anglerList.appendChild(div);
+  });
+
+  function selectAngler(i, el) {
+    selectedAngler = ANGLERS[i];
+    document.querySelectorAll(".angler").forEach(n => n.classList.remove("selected"));
+    el.classList.add("selected");
+    startBtn.disabled = false;
+    startBtn.textContent = "Mit " + selectedAngler.name + " angeln gehen 🎣";
+  }
+
+  startBtn.addEventListener("click", startGame);
+  $("againBtn").addEventListener("click", () => {
+    endScreen.classList.add("hidden");
+    startScreen.classList.remove("hidden");
+  });
+
+  // ---------- Spiel starten ----------
+  function startGame() {
+    if (!selectedAngler) return;
+    score = 0;
+    timeLeft = GAME_SECONDS;
+    fishes = [];
+    spawnTimer = 0;
+    running = true;
+
+    gameEl.innerHTML = "";
+    // Boot + Angler ins Spielfeld
+    const boat = document.createElement("div");
+    boat.className = "boat";
+    boat.textContent = "🛶";
+    gameEl.appendChild(boat);
+
+    const anglerIcon = document.createElement("div");
+    anglerIcon.className = "angler-icon";
+    anglerIcon.textContent = selectedAngler.face;
+    gameEl.appendChild(anglerIcon);
+
+    const hint = document.createElement("div");
+    hint.className = "hint";
+    hint.textContent = "Klick die Fische! 🐟";
+    gameEl.appendChild(hint);
+
+    hudPlayer.textContent = selectedAngler.face + " " + selectedAngler.name;
+    hudScore.textContent = "0";
+    hudTime.textContent = String(GAME_SECONDS);
+
+    startScreen.classList.add("hidden");
+    endScreen.classList.add("hidden");
+    playScreen.classList.remove("hidden");
+
+    // Countdown
+    clearInterval(countdownId);
+    countdownId = setInterval(() => {
+      timeLeft--;
+      hudTime.textContent = String(Math.max(0, timeLeft));
+      if (timeLeft <= 0) endGame();
+    }, 1000);
+
+    // Pre-spawn ein paar Fische
+    for (let k = 0; k < 4; k++) spawnFish();
+
+    lastTs = 0;
+    cancelAnimationFrame(rafId);
+    rafId = requestAnimationFrame(loop);
+  }
+
+  // ---------- Fisch erzeugen ----------
+  function pickType() {
+    const total = FISH_TYPES.reduce((s, t) => s + t.weight, 0);
+    let r = Math.random() * total;
+    for (const t of FISH_TYPES) {
+      if (r < t.weight) return t;
+      r -= t.weight;
+    }
+    return FISH_TYPES[0];
+  }
+
+  function spawnFish() {
+    const type = pickType();
+    const rect = gameEl.getBoundingClientRect();
+    const h = rect.height || 440;
+    const w = rect.width || 700;
+
+    const dir = Math.random() < 0.5 ? 1 : -1; // 1 = nach rechts
+    const el = document.createElement("div");
+    el.className = "fish" + (dir === 1 ? " flip" : "");
+    el.textContent = type.emoji;
+
+    // vertikale Position nur im Wasser (unterhalb ~22% bis ~88%)
+    const topPx = h * 0.26 + Math.random() * h * 0.56;
+    const startX = dir === 1 ? -40 : w + 40;
+
+    el.style.top = topPx + "px";
+    el.style.left = startX + "px";
+
+    const fish = {
+      el, type, dir,
+      x: startX,
+      y: topPx,
+      speed: (0.9 + type.speed) * (40 + Math.random() * 30), // px/s
+      alive: true,
+    };
+
+    el.addEventListener("pointerdown", (e) => {
+      e.stopPropagation();
+      catchFish(fish);
+    });
+
+    gameEl.appendChild(el);
+    fishes.push(fish);
+  }
+
+  // ---------- Fisch fangen ----------
+  function catchFish(fish) {
+    if (!fish.alive || !running) return;
+    fish.alive = false;
+
+    score += fish.type.points;
+    if (score < 0) score = 0;
+    hudScore.textContent = String(score);
+
+    // Punkte-Popup
+    const pop = document.createElement("div");
+    const isPlus = fish.type.points >= 0;
+    pop.className = "score-pop " + (isPlus ? "plus" : "minus");
+    pop.textContent = (isPlus ? "+" : "") + fish.type.points;
+    pop.style.left = fish.x + "px";
+    pop.style.top = fish.y + "px";
+    gameEl.appendChild(pop);
+    setTimeout(() => pop.remove(), 1000);
+
+    // Fisch wird "hochgezogen"
+    fish.el.classList.add("caught");
+    fish.el.style.top = "40px";
+    fish.el.style.transform = "scale(.5) rotate(25deg)";
+    setTimeout(() => fish.el.remove(), 500);
+  }
+
+  // ---------- Game-Loop ----------
+  function loop(ts) {
+    if (!running) return;
+    if (!lastTs) lastTs = ts;
+    const dt = Math.min(0.05, (ts - lastTs) / 1000);
+    lastTs = ts;
+
+    const rect = gameEl.getBoundingClientRect();
+    const w = rect.width || 700;
+
+    // Fische bewegen
+    for (const f of fishes) {
+      if (!f.alive) continue;
+      f.x += f.dir * f.speed * dt;
+      f.el.style.left = f.x + "px";
+      // raus = entfernen
+      if ((f.dir === 1 && f.x > w + 60) || (f.dir === -1 && f.x < -60)) {
+        f.alive = false;
+        f.el.remove();
+      }
+    }
+    fishes = fishes.filter(f => f.alive);
+
+    // Nachspawnen
+    spawnTimer -= dt;
+    if (spawnTimer <= 0 && fishes.length < 9) {
+      spawnFish();
+      spawnTimer = 0.5 + Math.random() * 0.7;
+    }
+
+    rafId = requestAnimationFrame(loop);
+  }
+
+  // ---------- Spiel beenden ----------
+  function endGame() {
+    running = false;
+    clearInterval(countdownId);
+    cancelAnimationFrame(rafId);
+
+    playScreen.classList.add("hidden");
+    endScreen.classList.remove("hidden");
+
+    $("endFace").textContent = selectedAngler.face;
+    $("endPlayer").textContent = selectedAngler.name;
+    $("endScore").textContent = String(score);
+
+    // Bewertung
+    let rank, headline;
+    if (score >= 90)      { rank = "🏆 Balık ustası – Angel-Meister!"; headline = "Harika!"; }
+    else if (score >= 55) { rank = "🥈 Starker Fang!"; headline = "Çok iyi!"; }
+    else if (score >= 25) { rank = "🥉 Nicht schlecht!"; headline = "Fena değil!"; }
+    else                  { rank = "🪣 Der Eimer bleibt fast leer…"; headline = "Oyun bitti!"; }
+    $("endHeadline").textContent = headline;
+    $("endRank").textContent = rank;
+
+    // Bestenliste pro Angler (localStorage)
+    try {
+      const key = "balikcilar_best";
+      const best = JSON.parse(localStorage.getItem(key) || "{}");
+      const prev = best[selectedAngler.name] || 0;
+      if (score > prev) best[selectedAngler.name] = score;
+      localStorage.setItem(key, JSON.stringify(best));
+      const parts = ANGLERS.map(a => a.name + ": " + (best[a.name] || 0));
+      $("bestLine").textContent = "🏅 Rekorde – " + parts.join("  •  ");
+    } catch (e) {
+      $("bestLine").textContent = "";
+    }
+  }
+
+  // Klick ins leere Wasser = kleines Feedback (kein Punkt)
+  gameEl.addEventListener("pointerdown", () => {
+    if (!running) return;
+    // optional: hier könnte man einen "daneben"-Effekt einbauen
+  });
+})();
+</script>
+</body>
+</html>
